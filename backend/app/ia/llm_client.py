@@ -97,6 +97,35 @@ IMPORTANTE: Use a previsao do tempo para:
 }}"""
 
 
+def montar_prompt_modificacao(roteiro_atual: dict, instrucao: str) -> str:
+    import json
+    return f"""Você receberá um roteiro de viagem em JSON e uma instrução de modificação do usuário.
+Aplique SOMENTE a modificação solicitada, mantendo toda a estrutura e os demais dados intactos.
+
+=== ROTEIRO ATUAL ===
+{json.dumps(roteiro_atual, ensure_ascii=False, indent=2)}
+
+=== INSTRUÇÃO DO USUÁRIO ===
+{instrucao}
+
+Responda SOMENTE com o JSON completo do roteiro modificado, no mesmo formato do roteiro atual."""
+
+
+async def modificar_roteiro(roteiro_atual: dict, instrucao: str) -> dict:
+    prompt = montar_prompt_modificacao(roteiro_atual, instrucao)
+
+    response = await client.aio.models.generate_content(
+        model="gemini-3-flash-preview",
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=SYSTEM_PROMPT,
+            response_mime_type="application/json",
+        ),
+    )
+
+    return json.loads(response.text)
+
+
 async def gerar_roteiro(dados: dict) -> dict:
     prompt = montar_prompt(dados)
 

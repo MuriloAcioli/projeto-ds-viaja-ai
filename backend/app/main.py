@@ -5,9 +5,10 @@ from sqlalchemy import select
 
 from app.db.database import get_db
 from app.db.models import Itinerary, ChatSession, ChatMessage
-from app.schemas.chat import MensagemChat, RespostaChat, ItineraryOut
+from app.schemas.chat import MensagemChat, RespostaChat, ItineraryOut, ModificarRoteiro, RespostaModificacao
 from app.services.sessao import criar_sessao, obter_sessao, salvar_sessao, deletar_sessao
 from app.services.chat_flow import processar_mensagem
+from app.ia.llm_client import modificar_roteiro
 
 app = FastAPI(title="ViajaAI API", version="2.0.0")
 
@@ -99,6 +100,29 @@ async def obter_viagem(viagem_id: int, db: AsyncSession = Depends(get_db)):
     if not viagem:
         raise HTTPException(status_code=404, detail="Viagem não encontrada.")
     return viagem
+
+
+@app.post("/api/viagens/{viagem_id}/modificar", response_model=RespostaModificacao)
+async def modificar_viagem(viagem_id: int, body: ModificarRoteiro, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Itinerary).where(Itinerary.id == viagem_id))
+    viagem = result.scalar_one_or_none()
+    if not viagem:
+        raise HTTPException(status_code=404, detail="Viagem não encontrada.")
+    if not viagem.content:
+        raise HTTPException(status_code=400, detail="Esta viagem não possui roteiro gerado.")
+
+    roteiro_modificado = await modificar_roteiro(viagem.content, body.instrucao)
+
+    viagem.content = roteiro_modificado
+    await db.commit()
+    await db.refresh(viagem)
+
+    return RespostaModificacao(
+        id=viagem.id,
+        destination=viagem.destination,
+        roteiro=roteiro_modificado,
+        mensagem=f"Roteiro de {viagem.destination} atualizado com sucesso! ✏️",
+    )
 
 
 @app.delete("/api/viagens/{viagem_id}")
