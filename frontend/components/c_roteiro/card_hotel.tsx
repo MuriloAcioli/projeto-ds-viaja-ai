@@ -1,6 +1,6 @@
-import { Hotel, Star, MapPin, Wifi, Waves, Coffee, Dumbbell, Sparkles, Utensils } from "lucide-react";
+import { Hotel, Star, MapPin, Wifi, Waves, Coffee, Dumbbell, Sparkles, Utensils, type LucideIcon } from "lucide-react";
 
-const ICON_MAP: Record<string, any> = {
+const ICON_MAP: Record<string, LucideIcon> = {
   "Wi-Fi Grátis": Wifi,
   "Piscina": Waves,
   "Café da Manhã": Coffee,
