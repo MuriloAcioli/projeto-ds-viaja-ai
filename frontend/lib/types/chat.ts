@@ -17,6 +17,10 @@ export interface VooOpcao {
   aeroporto_chegada?: string;
   duracao_minutos?: number;
   companhia?: string;
+  tipo_passagem?: string;
+  aeronave?: string;
+  numero_voo?: string;
+  logo_companhia?: string;
 }
 
 export interface HotelOpcao {

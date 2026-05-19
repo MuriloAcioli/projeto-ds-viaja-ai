@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Plane, Wifi, BatteryCharging, Tv } from "lucide-react";
 
 export interface CardVooProps {
@@ -8,17 +9,28 @@ export interface CardVooProps {
   partida: { hora: string; aeroporto: string; cidade: string };
   chegada: { hora: string; aeroporto: string; cidade: string };
   duracao: string;
-  detalhes: string; 
+  detalhes: string;
+  logoCompanhia?: string;
 }
 
-export function CardVoo({ tipo, data, preco, co2, partida, duracao, detalhes, chegada }: CardVooProps) {
+export function CardVoo({ tipo, data, preco, co2, partida, duracao, detalhes, chegada, logoCompanhia }: CardVooProps) {
   return (
     <div className="bg-white rounded-2xl border border-[#EACFC4] shadow-md p-6 w-full hover:shadow-lg transition-shadow">
       {/* Header do Card */}
       <div className="flex justify-between items-start mb-4">
         <div className="flex gap-4">
           <div className="w-12 h-12 rounded-full bg-[#FCF3F3] text-[#A63C3C] flex items-center justify-center shrink-0">
-            <Plane size={24} strokeWidth={1.5} />
+            {logoCompanhia ? (
+              <Image
+                src={logoCompanhia}
+                alt="Logo da companhia aérea"
+                width={32}
+                height={32}
+                className="h-8 w-8 object-contain"
+              />
+            ) : (
+              <Plane size={24} strokeWidth={1.5} />
+            )}
           </div>
           <div>
             <h3 className="font-bold text-[#0F2942] text-lg">Voo de {tipo}</h3>

@@ -41,10 +41,15 @@ async def buscar_voos(origem: str, destino: str, data_ida: str, data_volta: str 
     voos = []
     for opcao in flights_results:
         flights = opcao.get("flights") or [{}]
+        trecho_principal = flights[0]
         partida = flights[0].get("departure_airport", {})
         chegada = flights[-1].get("arrival_airport", {})
         voos.append({
-            "companhia": flights[0].get("airline", "N/A"),
+            "companhia": trecho_principal.get("airline", "N/A"),
+            "tipo_passagem": trecho_principal.get("travel_class", ""),
+            "aeronave": trecho_principal.get("airplane", ""),
+            "numero_voo": trecho_principal.get("flight_number", ""),
+            "logo_companhia": trecho_principal.get("airline_logo") or opcao.get("airline_logo", ""),
             "preco": opcao.get("price", 0),
             "duracao_minutos": opcao.get("total_duration", 0),
             "partida": partida.get("time", ""),
@@ -132,13 +137,17 @@ def _mock_voos(origem, destino, data_ida, data_volta):
             "aeroporto_partida": origem,
             "aeroporto_chegada": destino,
             "escalas": escalas,
+            "tipo_passagem": "Econômica",
+            "aeronave": aeronave,
+            "numero_voo": numero_voo,
+            "logo_companhia": logo_companhia,
         }
-        for companhia, preco, duracao, partida, chegada, escalas in [
-            ("LATAM Airlines", 850, 180, "08:00", "11:00", 0),
-            ("GOL", 920, 195, "10:30", "13:45", 0),
-            ("Azul", 980, 220, "13:15", "16:55", 1),
-            ("LATAM Airlines", 1040, 210, "16:40", "20:10", 1),
-            ("GOL", 1120, 185, "19:20", "22:25", 0),
+        for companhia, preco, duracao, partida, chegada, escalas, aeronave, numero_voo, logo_companhia in [
+            ("LATAM Airlines", 850, 180, "08:00", "11:00", 0, "Airbus A320", "LA 3377", "https://www.gstatic.com/flights/airline_logos/70px/LA.png"),
+            ("GOL", 920, 195, "10:30", "13:45", 0, "Boeing 737", "G3 1652", "https://www.gstatic.com/flights/airline_logos/70px/G3.png"),
+            ("Azul", 980, 220, "13:15", "16:55", 1, "Embraer 195", "AD 4721", "https://www.gstatic.com/flights/airline_logos/70px/AD.png"),
+            ("LATAM Airlines", 1040, 210, "16:40", "20:10", 1, "Airbus A321", "LA 3498", "https://www.gstatic.com/flights/airline_logos/70px/LA.png"),
+            ("GOL", 1120, 185, "19:20", "22:25", 0, "Boeing 737", "G3 2145", "https://www.gstatic.com/flights/airline_logos/70px/G3.png"),
         ]
     ]
 
