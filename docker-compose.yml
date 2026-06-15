@@ -12,7 +12,12 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://admin:adminpassword@db:5432/viajaai_db
       - DATABASE_URL_SYNC=postgresql://admin:adminpassword@db:5432/viajaai_db
-      - GEMINI_API_KEY=AIzaSyBhcxuDUe7nK2iHBhU5d7BAXDiDbAEx8Ks
+      # Chaves de API lidas do arquivo .env (ver .env.example). Nunca commitar valores reais.
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - SERPAPI_API_KEY=${SERPAPI_API_KEY:-}
+      - TRIPADVISOR_API_KEY=${TRIPADVISOR_API_KEY:-}
+      - OPENWEATHERMAP_API_KEY=${OPENWEATHERMAP_API_KEY:-}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-secret-trocar-em-producao}
       - REDIS_URL=redis://redis:6379
       - WATCHFILES_FORCE_POLLING=true
 
