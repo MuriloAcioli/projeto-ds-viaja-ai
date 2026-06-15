@@ -10,22 +10,34 @@ Crie roteiros detalhados, práticos e com sugestões autênticas.
 Responda SOMENTE com JSON válido."""
 
 
+def _descrever_voo(voo: dict | None) -> str:
+    if not voo:
+        return "Não informado"
+    return (
+        f"{voo.get('companhia', 'N/A')} | R$ {voo.get('preco', '?')} | "
+        f"{voo.get('escalas', 0)} escala(s) | {voo.get('duracao_minutos', 0)} min"
+    )
+
+
 def montar_prompt(dados: dict) -> str:
-    voo = dados.get("voo", {})
-    hoteis = dados.get("hoteis", [])
+    voo_ida = dados.get("voo_ida") or {}
+    voo_volta = dados.get("voo_volta") or {}
+    hotel = dados.get("hotel") or {}
     atracoes = dados.get("atracoes", [])
     clima = dados.get("clima", {})
 
-    hoteis_texto = "\n".join(
-        f"- {h['nome']}: {h['preco_noite']}/noite, avaliação {h['avaliacao']}"
-        for h in hoteis
-    )
+    if hotel:
+        hotel_texto = (
+            f"{hotel.get('nome', 'N/A')}: {hotel.get('preco_noite', '?')}/noite, "
+            f"avaliação {hotel.get('avaliacao', '?')}"
+        )
+    else:
+        hotel_texto = "Não encontrado"
     atracoes_texto = "\n".join(f"- {a['nome']} ({a['endereco']})" for a in atracoes)
 
     voo_texto = (
-        f"{voo.get('companhia','N/A')} | R$ {voo.get('preco','?')} | "
-        f"{voo.get('escalas', 0)} escala(s) | {voo.get('duracao_minutos', 0)} min"
-        if voo else "Não informado"
+        f"Ida: {_descrever_voo(voo_ida)}\n"
+        f"Volta: {_descrever_voo(voo_volta)}"
     )
 
     previsao = clima.get("previsao_por_dia", [])
@@ -51,11 +63,14 @@ Orcamento total: R$ {dados.get('orcamento', 'nao informado')}
 Estilo de viagem: {dados.get('estilo', 'turismo geral')}
 Interesses: {dados.get('interesses', 'nao informados')}
 
-=== VOOS ENCONTRADOS ===
+=== VOOS ESCOLHIDOS ===
 {voo_texto}
 
-=== HOTEIS DISPONIVEIS ===
-{hoteis_texto or 'Nao encontrados'}
+=== HOTEL ESCOLHIDO ===
+{hotel_texto}
+
+IMPORTANTE: O custo_estimado_total e as atividades devem respeitar o orcamento
+total informado acima, considerando voos e hospedagem ja escolhidos.
 
 === ATRACOES E PONTOS DE INTERESSE ===
 {atracoes_texto or 'Nao encontradas'}

@@ -39,6 +39,7 @@ class ItineraryOut(BaseModel):
     id: int
     destination: str
     content: Optional[dict]
+    trip_data: Optional[dict] = None
     created_at: datetime
 
     class Config:

@@ -83,12 +83,22 @@ async def usuario_atual(user: User = Depends(get_current_user)):
     return UserOut(id=user.id, nome=user.nome, email=user.email)
 
 
+@app.post("/api/auth/logout")
+async def logout_usuario(user: User = Depends(get_current_user)):
+    # JWT é stateless: o cliente descarta o token. O endpoint apenas valida
+    # a sessão atual e confirma o encerramento.
+    return {"mensagem": "Logout realizado com sucesso."}
+
+
 # ---------------------------------------------------------------------------
 # Chat
 # ---------------------------------------------------------------------------
 
 @app.post("/api/chat/iniciar")
-async def iniciar_chat(db: AsyncSession = Depends(get_db)):
+async def iniciar_chat(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     sessao = criar_sessao()
 
     chat_session = ChatSession(sessao_id=sessao.sessao_id, etapa_atual="destino")
@@ -105,7 +115,11 @@ async def iniciar_chat(db: AsyncSession = Depends(get_db)):
 
 
 @app.post("/api/chat/mensagem", response_model=RespostaChat)
-async def enviar_mensagem(body: MensagemChat, db: AsyncSession = Depends(get_db)):
+async def enviar_mensagem(
+    body: MensagemChat,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     sessao = await obter_sessao(body.sessao_id)
     if not sessao:
         raise HTTPException(status_code=404, detail="Sessão não encontrada. Inicie um novo chat.")
@@ -123,7 +137,23 @@ async def enviar_mensagem(body: MensagemChat, db: AsyncSession = Depends(get_db)
         db.add(ChatMessage(role="assistant", content=resposta.mensagem_bot, session_id=chat_session.id))
 
         if resposta.roteiro:
-            itinerary = Itinerary(destination=sessao.destino, content=resposta.roteiro)
+            itinerary = Itinerary(
+                destination=sessao.destino,
+                content=resposta.roteiro,
+                user_id=user.id,
+                trip_data={
+                    "destino": sessao.destino,
+                    "origem": sessao.origem,
+                    "data_ida": sessao.data_ida,
+                    "data_volta": sessao.data_volta,
+                    "num_pessoas": sessao.num_pessoas,
+                    "orcamento": sessao.orcamento,
+                    "estilo": sessao.estilo,
+                    "voo_ida": sessao.voo_ida_escolhido,
+                    "voo_volta": sessao.voo_volta_escolhido,
+                    "hotel": sessao.hotel_escolhido,
+                },
+            )
             db.add(itinerary)
             await db.flush()
             chat_session.itinerary_id = itinerary.id
@@ -136,7 +166,11 @@ async def enviar_mensagem(body: MensagemChat, db: AsyncSession = Depends(get_db)
 
 
 @app.delete("/api/chat/{sessao_id}")
-async def encerrar_chat(sessao_id: str, db: AsyncSession = Depends(get_db)):
+async def encerrar_chat(
+    sessao_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     await deletar_sessao(sessao_id)
     result = await db.execute(select(ChatSession).where(ChatSession.sessao_id == sessao_id))
     chat_session = result.scalar_one_or_none()
@@ -150,27 +184,50 @@ async def encerrar_chat(sessao_id: str, db: AsyncSession = Depends(get_db)):
 # Viagens
 # ---------------------------------------------------------------------------
 
-@app.get("/api/viagens", response_model=list[ItineraryOut])
-async def listar_viagens(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Itinerary))
-    return result.scalars().all()
-
-
-@app.get("/api/viagens/{viagem_id}", response_model=ItineraryOut)
-async def obter_viagem(viagem_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Itinerary).where(Itinerary.id == viagem_id))
+async def _obter_viagem_do_usuario(viagem_id: int, db: AsyncSession, user: User) -> Itinerary:
+    """Busca um itinerário garantindo que ele pertence ao usuário autenticado."""
+    result = await db.execute(
+        select(Itinerary).where(
+            Itinerary.id == viagem_id,
+            Itinerary.user_id == user.id,
+        )
+    )
     viagem = result.scalar_one_or_none()
     if not viagem:
         raise HTTPException(status_code=404, detail="Viagem não encontrada.")
     return viagem
 
 
+@app.get("/api/viagens", response_model=list[ItineraryOut])
+async def listar_viagens(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Itinerary)
+        .where(Itinerary.user_id == user.id)
+        .order_by(Itinerary.created_at.desc())
+    )
+    return result.scalars().all()
+
+
+@app.get("/api/viagens/{viagem_id}", response_model=ItineraryOut)
+async def obter_viagem(
+    viagem_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return await _obter_viagem_do_usuario(viagem_id, db, user)
+
+
 @app.post("/api/viagens/{viagem_id}/modificar", response_model=RespostaModificacao)
-async def modificar_viagem(viagem_id: int, body: ModificarRoteiro, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Itinerary).where(Itinerary.id == viagem_id))
-    viagem = result.scalar_one_or_none()
-    if not viagem:
-        raise HTTPException(status_code=404, detail="Viagem não encontrada.")
+async def modificar_viagem(
+    viagem_id: int,
+    body: ModificarRoteiro,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    viagem = await _obter_viagem_do_usuario(viagem_id, db, user)
     if not viagem.content:
         raise HTTPException(status_code=400, detail="Esta viagem não possui roteiro gerado.")
 
@@ -189,11 +246,12 @@ async def modificar_viagem(viagem_id: int, body: ModificarRoteiro, db: AsyncSess
 
 
 @app.delete("/api/viagens/{viagem_id}")
-async def deletar_viagem(viagem_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Itinerary).where(Itinerary.id == viagem_id))
-    viagem = result.scalar_one_or_none()
-    if not viagem:
-        raise HTTPException(status_code=404, detail="Viagem não encontrada.")
+async def deletar_viagem(
+    viagem_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    viagem = await _obter_viagem_do_usuario(viagem_id, db, user)
     await db.delete(viagem)
     await db.commit()
     return {"mensagem": "Viagem removida do histórico."}

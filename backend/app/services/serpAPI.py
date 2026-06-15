@@ -8,10 +8,18 @@ BASE_URL = "https://serpapi.com/search"
 IATA_RE = re.compile(r"^[A-Z]{3}$")
 
 
-async def buscar_voos(origem: str, destino: str, data_ida: str, data_volta: str = None) -> list[dict]:
-    """Busca voos via SerpAPI (Google Flights)."""
+async def buscar_voos(
+    origem: str,
+    destino: str,
+    data_ida: str,
+    data_volta: str = None,
+    orcamento: float | None = None,
+) -> list[dict]:
+    """Busca voos via SerpAPI (Google Flights), limitando pelo orçamento quando informado."""
     if not SERPAPI_KEY:
-        return _mock_voos(origem, destino, data_ida, data_volta)
+        return _filtrar_por_orcamento(
+            _mock_voos(origem, destino, data_ida, data_volta), orcamento
+        )
 
     async with httpx.AsyncClient() as client:
         origem_id = await _resolver_aeroporto(client, origem)
@@ -26,6 +34,8 @@ async def buscar_voos(origem: str, destino: str, data_ida: str, data_volta: str 
             "hl": "pt",
             "api_key": SERPAPI_KEY,
         }
+        if orcamento:
+            params["max_price"] = int(orcamento)
         if data_volta:
             params["return_date"] = data_volta
             params["type"] = "1"  # round trip
@@ -37,7 +47,9 @@ async def buscar_voos(origem: str, destino: str, data_ida: str, data_volta: str 
 
     flights_results = (data.get("best_flights", []) + data.get("other_flights", []))[:5]
     if not flights_results:
-        return _mock_voos(origem, destino, data_ida, data_volta)
+        return _filtrar_por_orcamento(
+            _mock_voos(origem, destino, data_ida, data_volta), orcamento
+        )
 
     voos = []
     for opcao in flights_results:
@@ -61,7 +73,7 @@ async def buscar_voos(origem: str, destino: str, data_ida: str, data_volta: str 
             "link_passagem": opcao.get("link") or opcao.get("serpapi_google_flights_link") or _montar_link_google_flights(origem_id, destino_id, data_ida),
         })
 
-    return voos
+    return _filtrar_por_orcamento(voos, orcamento)
 
 
 async def _resolver_aeroporto(client: httpx.AsyncClient, cidade: str) -> str:
@@ -91,31 +103,38 @@ async def _resolver_aeroporto(client: httpx.AsyncClient, cidade: str) -> str:
     return termo
 
 
-async def buscar_hoteis(destino: str, checkin: str, checkout: str, adultos: int = 2) -> list[dict]:
-    """Busca hotéis via SerpAPI (Google Hotels)."""
+async def buscar_hoteis(
+    destino: str,
+    checkin: str,
+    checkout: str,
+    adultos: int = 2,
+    orcamento: float | None = None,
+) -> list[dict]:
+    """Busca hotéis via SerpAPI (Google Hotels), limitando pela diária máxima quando há orçamento."""
     if not SERPAPI_KEY:
-        return _mock_hoteis(destino)
+        return _filtrar_hoteis_por_orcamento(_mock_hoteis(destino), orcamento)
 
     async with httpx.AsyncClient() as client:
-        r = await client.get(
-            BASE_URL,
-            params={
-                "engine": "google_hotels",
-                "q": f"hotéis em {destino}",
-                "check_in_date": checkin,
-                "check_out_date": checkout,
-                "adults": adultos,
-                "currency": "BRL",
-                "hl": "pt",
-                "api_key": SERPAPI_KEY,
-            },
-            timeout=15,
-        )
+        params = {
+            "engine": "google_hotels",
+            "q": f"hotéis em {destino}",
+            "check_in_date": checkin,
+            "check_out_date": checkout,
+            "adults": adultos,
+            "currency": "BRL",
+            "hl": "pt",
+            "api_key": SERPAPI_KEY,
+        }
+        # Orçamento é o total da viagem; usamos como teto da diária para excluir
+        # hotéis claramente acima do que o usuário pode gastar.
+        if orcamento:
+            params["max_price"] = int(orcamento)
+        r = await client.get(BASE_URL, params=params, timeout=15)
         data = r.json()
 
     propriedades = data.get("properties", [])[:3]
     if not propriedades:
-        return _mock_hoteis(destino)
+        return _filtrar_hoteis_por_orcamento(_mock_hoteis(destino), orcamento)
 
     hoteis = []
     async with httpx.AsyncClient() as client:
@@ -130,7 +149,7 @@ async def buscar_hoteis(destino: str, checkin: str, checkout: str, adultos: int 
                 "link_hotel": _extrair_link_reserva_hotel(detalhes) or _extrair_link_reserva_hotel(h) or h.get("link") or h.get("serpapi_property_details_link") or h.get("serpapi_google_hotels_link", ""),
             })
 
-    return hoteis
+    return _filtrar_hoteis_por_orcamento(hoteis, orcamento)
 
 
 async def _buscar_detalhes_hotel(client: httpx.AsyncClient, hotel: dict, checkin: str, checkout: str, adultos: int) -> dict:
@@ -189,6 +208,40 @@ def _extrair_imagem_hotel(hotel: dict) -> str:
                 return url
 
     return ""
+
+
+def _preco_para_numero(valor) -> float | None:
+    """Converte preços em formatos variados (1234, '1.234', 'R$ 280') em float."""
+    if valor is None:
+        return None
+    if isinstance(valor, (int, float)):
+        return float(valor)
+    nums = re.findall(r"[\d.,]+", str(valor).replace(".", "").replace(",", "."))
+    try:
+        return float(nums[0]) if nums else None
+    except ValueError:
+        return None
+
+
+def _filtrar_por_orcamento(voos: list[dict], orcamento: float | None) -> list[dict]:
+    """Mantém apenas voos dentro do orçamento. Se nenhum couber, devolve a lista
+    original para não travar o fluxo do chat."""
+    if not orcamento:
+        return voos
+    dentro = [v for v in voos if (_preco_para_numero(v.get("preco")) or 0) <= orcamento]
+    return dentro or voos
+
+
+def _filtrar_hoteis_por_orcamento(hoteis: list[dict], orcamento: float | None) -> list[dict]:
+    """Mantém apenas hotéis com diária dentro do orçamento total informado.
+    Se nenhum couber, devolve a lista original para não travar o fluxo."""
+    if not orcamento:
+        return hoteis
+    dentro = [
+        h for h in hoteis
+        if (_preco_para_numero(h.get("preco_noite")) or 0) <= orcamento
+    ]
+    return dentro or hoteis
 
 
 def _montar_link_google_flights(origem: str, destino: str, data_ida: str) -> str:

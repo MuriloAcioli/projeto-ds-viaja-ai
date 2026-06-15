@@ -18,8 +18,11 @@ class Itinerary(Base):
     id = Column(Integer, primary_key=True, index=True)
     destination = Column(String, nullable=False)
     content = Column(JSONB)
+    # Metadados da viagem (origem, datas, voos e hotel escolhidos, etc.) usados
+    # para reconstruir os cards no Histórico. content guarda só o roteiro.
+    trip_data = Column(JSONB)
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+
     user_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="itineraries")
     chat_sessions = relationship("ChatSession", back_populates="itinerary")

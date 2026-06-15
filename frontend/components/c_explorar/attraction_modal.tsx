@@ -134,7 +134,7 @@ export function AttractionModal({
                           ))}
                         </div>
                       </div>
-                      <p className="text-gray-600 text-sm italic">"{review.text}"</p>
+                      <p className="text-gray-600 text-sm italic">&ldquo;{review.text}&rdquo;</p>
                     </div>
                   ))}
                 </div>
@@ -144,9 +144,12 @@ export function AttractionModal({
           
           <div className="mt-auto sticky bottom-0 p-6 bg-gradient-to-t from-white via-white to-transparent">
             <Button
+              onClick={() => {
+                window.location.href = `/chat?destino=${encodeURIComponent(attraction.city)}`;
+              }}
               className="w-full bg-[#0F2942] hover:bg-[#0F2942]/90 text-white rounded-full py-6 font-semibold shadow-lg group"
             >
-              Adicionar ao meu roteiro
+              Planejar viagem para {attraction.city}
               <ArrowRight className="ml-2 w-5 h-5 transition-transform group-hover:translate-x-1" />
             </Button>
           </div>
