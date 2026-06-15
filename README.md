@@ -14,6 +14,7 @@ Plataforma de roteiros de viagem personalizados gerados por IA, com busca real d
 - [SerpAPI](https://serpapi.com/) — busca de voos e hotéis
 - [TripAdvisor Content API](https://tripadvisor.com/developers) — atrações e pontos de interesse
 - [OpenWeatherMap](https://openweathermap.org/api) — previsão do tempo
+- JWT & bcrypt — segurança e autenticação de usuários
 
 **Frontend**
 
@@ -320,11 +321,20 @@ Observação: essa cobertura considera os arquivos incluídos na configuração 
 | `OPENWEATHERMAP_API_KEY` | [openweathermap.org/api](https://openweathermap.org/api)         | Não\* |
 | `DATABASE_URL`           | —                                                                | Sim         |
 | `DATABASE_URL_SYNC`      | —                                                                | Sim         |
+| `JWT_SECRET_KEY`         | Gerar uma string aleatória segura (ex: `openssl rand -hex 32`)   | Não\* |
 | `NEXT_PUBLIC_API_URL`    | URL local ou publicada do backend                                | Não |
 
-\*Se não configurada, o serviço usa dados mock automaticamente.
+\*Se `JWT_SECRET_KEY` não for configurada, o backend usa uma chave padrão insegura para desenvolvimento.
 
 ## Endpoints principais
+
+### Autenticação
+
+| Método   | Endpoint                | Descrição                              |
+| -------- | ----------------------- | -------------------------------------- |
+| `POST`   | `/api/auth/registro`    | Registra um novo usuário               |
+| `POST`   | `/api/auth/login`       | Autentica e retorna o token JWT        |
+| `GET`    | `/api/auth/me`          | Retorna os dados do usuário logado     |
 
 ### Chat (fluxo principal)
 
