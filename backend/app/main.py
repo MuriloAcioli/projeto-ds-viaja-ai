@@ -4,12 +4,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.db.database import get_db
-from app.db.models import Itinerary, ChatSession, ChatMessage
+from app.db.models import User, Itinerary, ChatSession, ChatMessage
 from app.schemas.chat import MensagemChat, RespostaChat, ItineraryOut, ModificarRoteiro, RespostaModificacao
+from app.schemas.auth import UserCreate, UserLogin, TokenResponse, UserOut
 from app.schemas.explorar import RespostaDestinos, RespostaAtracoes
 from app.services.sessao import criar_sessao, obter_sessao, salvar_sessao, deletar_sessao
 from app.services.chat_flow import processar_mensagem
 from app.services.explorar import listar_destinos, buscar_atracoes_por_cidade
+from app.services.auth import hash_password, verify_password, create_access_token, get_current_user
 from app.ia.llm_client import modificar_roteiro
 
 app = FastAPI(title="ViajaAI API", version="2.0.0")
@@ -29,6 +31,56 @@ app.add_middleware(
 @app.get("/api/status")
 def check_status():
     return {"status": "online", "mensagem": "Servidor do ViajaAI rodando com sucesso!", "versao": "2.0.0"}
+
+
+# ---------------------------------------------------------------------------
+# Auth
+# ---------------------------------------------------------------------------
+
+@app.post("/api/auth/registro", response_model=TokenResponse)
+async def registrar_usuario(body: UserCreate, db: AsyncSession = Depends(get_db)):
+    # Verificar se o email já está em uso
+    result = await db.execute(select(User).where(User.email == body.email))
+    existing_user = result.scalar_one_or_none()
+    if existing_user:
+        raise HTTPException(status_code=409, detail="Este e-mail já está cadastrado.")
+
+    # Criar o usuário
+    user = User(
+        nome=body.nome,
+        email=body.email,
+        hashed_password=hash_password(body.senha),
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    # Gerar token
+    token = create_access_token(user.id, user.email)
+    return TokenResponse(
+        access_token=token,
+        user=UserOut(id=user.id, nome=user.nome, email=user.email),
+    )
+
+
+@app.post("/api/auth/login", response_model=TokenResponse)
+async def login_usuario(body: UserLogin, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.email == body.email))
+    user = result.scalar_one_or_none()
+
+    if not user or not verify_password(body.senha, user.hashed_password):
+        raise HTTPException(status_code=401, detail="E-mail ou senha incorretos.")
+
+    token = create_access_token(user.id, user.email)
+    return TokenResponse(
+        access_token=token,
+        user=UserOut(id=user.id, nome=user.nome, email=user.email),
+    )
+
+
+@app.get("/api/auth/me", response_model=UserOut)
+async def usuario_atual(user: User = Depends(get_current_user)):
+    return UserOut(id=user.id, nome=user.nome, email=user.email)
 
 
 # ---------------------------------------------------------------------------

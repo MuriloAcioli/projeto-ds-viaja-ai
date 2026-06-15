@@ -7,6 +7,7 @@ import { Campo } from "@/components/c_auth/campo";
 import { TEXTOS } from "@/components/c_auth/textos";
 import type { Visao } from "@/components/c_auth/types";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/hooks/useAuth";
 
 export function AuthContent({
   visao,
@@ -17,22 +18,50 @@ export function AuthContent({
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { login, registro, user } = useAuth();
 
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [erro, setErro] = useState("");
+  const [carregando, setCarregando] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("aba") === "registro") setVisao("registro");
   }, [searchParams, setVisao]);
 
+  // If user is already logged in, redirect to chat
+  useEffect(() => {
+    if (user) {
+      router.push("/chat");
+    }
+  }, [user, router]);
+
   const { titulo, subtitulo, botao } = TEXTOS[visao];
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (visao === "login") router.push("/chat");
-    if (visao === "registro") console.log("Registro:", { nome, email, senha });
-    if (visao === "recuperar") console.log("Recuperação:", { email });
+    setErro("");
+    setCarregando(true);
+
+    try {
+      if (visao === "login") {
+        await login(email, senha);
+        router.push("/chat");
+      } else if (visao === "registro") {
+        await registro(nome, email, senha);
+        router.push("/chat");
+      } else if (visao === "recuperar") {
+        // Recuperação de senha não implementada ainda
+        setErro("Funcionalidade de recuperação de senha em breve!");
+      }
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Ocorreu um erro inesperado.";
+      setErro(message);
+    } finally {
+      setCarregando(false);
+    }
   };
 
   return (
@@ -94,12 +123,26 @@ export function AuthContent({
             </Campo>
           )}
 
+          {erro && (
+            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+              {erro}
+            </div>
+          )}
+
           <Button
             type="submit"
             size="lg"
-            className="mt-2 h-12 w-full text-base rounded-xl"
+            disabled={carregando}
+            className="mt-2 h-12 w-full text-base rounded-xl disabled:opacity-60"
           >
-            {botao}
+            {carregando ? (
+              <span className="flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Aguarde...
+              </span>
+            ) : (
+              botao
+            )}
           </Button>
         </form>
 
@@ -109,7 +152,10 @@ export function AuthContent({
               Ainda não tem uma conta?{" "}
               <button
                 type="button"
-                onClick={() => setVisao("registro")}
+                onClick={() => {
+                  setVisao("registro");
+                  setErro("");
+                }}
                 className="font-semibold text-primary hover:underline"
               >
                 Crie aqui
@@ -121,7 +167,10 @@ export function AuthContent({
               Já tem uma conta?{" "}
               <button
                 type="button"
-                onClick={() => setVisao("login")}
+                onClick={() => {
+                  setVisao("login");
+                  setErro("");
+                }}
                 className="font-semibold text-primary hover:underline"
               >
                 Faça login
@@ -131,7 +180,10 @@ export function AuthContent({
           {visao === "recuperar" && (
             <button
               type="button"
-              onClick={() => setVisao("login")}
+              onClick={() => {
+                setVisao("login");
+                setErro("");
+              }}
               className="font-semibold text-primary hover:underline flex items-center justify-center gap-2 w-full"
             >
               ← Voltar para o Login

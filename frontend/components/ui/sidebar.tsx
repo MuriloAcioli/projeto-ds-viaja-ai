@@ -2,11 +2,14 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Compass, Home, MessageSquare, History, Settings, User } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Compass, Home, MessageSquare, History, Settings, LogOut } from "lucide-react";
+import { useAuth } from "@/lib/hooks/useAuth";
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, logout } = useAuth();
 
   const getLinkStyle = (path: string) => {
     const isActive = pathname === path || pathname.startsWith(`${path}/`);
@@ -15,6 +18,21 @@ export function Sidebar() {
     }
     return "flex items-center justify-center lg:justify-start gap-3 p-3 lg:px-4 rounded-2xl text-[#0F2942] hover:bg-white/60 transition-colors opacity-70 hover:opacity-100";
   };
+
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
+  };
+
+  // Get initials from the user's name
+  const initials = user?.nome
+    ? user.nome
+        .split(" ")
+        .map((n) => n[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()
+    : "?";
 
   return (
     <>
@@ -70,12 +88,37 @@ export function Sidebar() {
             <span className="hidden lg:block font-medium">Configurações</span>
           </Link>
 
-          <Link href="/login" className="flex items-center justify-center lg:justify-start gap-3 p-3 lg:px-4 rounded-2xl text-[#0F2942] hover:bg-white/60 transition-colors opacity-70 hover:opacity-100">
-            <User size={22} strokeWidth={1.5} />
-            <span className="hidden lg:block font-medium">Meu Perfil</span>
-          </Link>
+          {user && (
+            <div className="flex items-center justify-center lg:justify-start gap-3 p-3 lg:px-4 rounded-2xl bg-white/50 border border-white/60">
+              <div className="w-9 h-9 shrink-0 rounded-full bg-[#0F2942] flex items-center justify-center text-white text-sm font-bold">
+                {initials}
+              </div>
+              <div className="hidden lg:flex flex-col flex-1 min-w-0">
+                <span className="text-sm font-semibold text-[#0F2942] truncate">{user.nome}</span>
+                <span className="text-xs text-gray-500 truncate">{user.email}</span>
+              </div>
+              <button
+                onClick={handleLogout}
+                title="Sair"
+                className="hidden lg:flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+              >
+                <LogOut size={16} strokeWidth={1.5} />
+              </button>
+            </div>
+          )}
+
+          {/* Mobile logout button */}
+          {user && (
+            <button
+              onClick={handleLogout}
+              title="Sair"
+              className="flex lg:hidden items-center justify-center p-3 rounded-2xl text-[#0F2942] hover:bg-red-50 hover:text-red-500 transition-colors opacity-70 hover:opacity-100"
+            >
+              <LogOut size={22} strokeWidth={1.5} />
+            </button>
+          )}
         </div>
       </aside>
     </>
   );
-}
+}
