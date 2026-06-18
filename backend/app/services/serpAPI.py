@@ -7,6 +7,10 @@ SERPAPI_KEY = os.getenv("SERPAPI_API_KEY", "")
 BASE_URL = "https://serpapi.com/search"
 IATA_RE = re.compile(r"^[A-Z]{3}$")
 
+def _montar_link_google_hotels(nome: str, destino: str) -> str:
+    query = quote_plus(f"{nome} {destino}")
+    return f"https://www.google.com/travel/search?q={query}"
+
 
 async def buscar_voos(
     origem: str,
@@ -70,7 +74,7 @@ async def buscar_voos(
             "aeroporto_partida": partida.get("name", origem_id),
             "aeroporto_chegada": chegada.get("name", destino_id),
             "escalas": len(flights) - 1,
-            "link_passagem": opcao.get("link") or opcao.get("serpapi_google_flights_link") or _montar_link_google_flights(origem_id, destino_id, data_ida),
+            "link_passagem": opcao.get("link") or _montar_link_google_flights(origem_id, destino_id, data_ida),
         })
 
     return _filtrar_por_orcamento(voos, orcamento)
@@ -146,7 +150,11 @@ async def buscar_hoteis(
                 "avaliacao": h.get("overall_rating", "N/A"),
                 "descricao": h.get("description", ""),
                 "imagem_url": _extrair_imagem_hotel(h) or _extrair_imagem_hotel(detalhes),
-                "link_hotel": _extrair_link_reserva_hotel(detalhes) or _extrair_link_reserva_hotel(h) or h.get("link") or h.get("serpapi_property_details_link") or h.get("serpapi_google_hotels_link", ""),
+                "link_hotel": (
+                    _extrair_link_reserva_hotel(detalhes)
+                    or _extrair_link_reserva_hotel(h)
+                    or _montar_link_google_hotels(h.get("name", ""), destino)
+                ),
             })
 
     return _filtrar_hoteis_por_orcamento(hoteis, orcamento)
