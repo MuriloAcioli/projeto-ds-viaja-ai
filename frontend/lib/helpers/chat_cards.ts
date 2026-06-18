@@ -59,7 +59,7 @@ export function montarPropsVoo(
     duracao: formatarDuracao(voo.duracao_minutos || 0),
     detalhes: montarDetalhesVoo(voo),
     logoCompanhia: voo.logo_companhia,
-    linkPassagem: voo.link_passagem || voo.link || voo.serpapi_google_flights_link,
+    linkPassagem: voo.link_passagem,
   };
 }
 
@@ -81,6 +81,6 @@ export function montarPropsHotel(
     checkOut: "12:00",
     comodidades,
     imagemUrl: hotel.imagem_url || hotel.thumbnail || hotel.foto_url || hotel.image,
-    linkHotel: hotel.link_hotel || hotel.link || hotel.serpapi_property_details_link || hotel.serpapi_google_hotels_link,
+    linkHotel: hotel.link_hotel,
   };
 }
