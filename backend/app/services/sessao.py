@@ -20,15 +20,17 @@ def _get_redis() -> aioredis.Redis:
     global _redis
     if _redis is None:
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-        logger.info("Conectando ao Redis: %s", redis_url[:30] + "...")
-        # ssl_cert_reqs=None é necessário para provedores como Upstash (rediss://)
-        # que usam TLS mas cujo certificado pode não ser validável em todos os ambientes.
-        import ssl as _ssl
-        _redis = aioredis.from_url(
-            redis_url,
-            decode_responses=True,
-            ssl_cert_reqs=_ssl.CERT_NONE if redis_url.startswith("rediss://") else None,
-        )
+        
+        # O segredo está na palavra "none" entre aspas!
+        if redis_url.startswith("rediss://"):
+            _redis = aioredis.from_url(
+                redis_url, 
+                decode_responses=True, 
+                ssl_cert_reqs="none"  
+            )
+        else:
+            _redis = aioredis.from_url(redis_url, decode_responses=True)
+            
     return _redis
 
 
